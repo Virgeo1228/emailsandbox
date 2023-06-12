@@ -1,0 +1,19 @@
+import requests
+
+# Function to check web access
+def check_web_access(url):
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            # Web access condition is met
+            print("Web access condition is triggered!")
+        else:
+            print("Web access condition is not met.")
+    except requests.exceptions.RequestException as e:
+        print("Error occurred during web access:", str(e))
+
+# URL to monitor
+url_to_monitor = "https://www.example.com"
+
+# Check web access
+check_web_access(url_to_monitor)

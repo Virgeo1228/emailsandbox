@@ -1,19 +1,140 @@
+#!/usr/bin/env python3
+from scapy.all import *
+from tldextract import *
 import requests
+import base64
+import json
+from tkinter import *
+from tkinter import ttk
 
-# Function to check web access
-def check_web_access(url):
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            # Web access condition is met
-            print("Web access condition is triggered!")
+
+data = {}
+
+
+def virus_total(base_url):
+    #URL must be encoded to work with the VirusTotal API
+    print(f"testing {base_url}")
+    print(len(base_url))
+    if len(base_url) != 0:
+        url_id = base64.urlsafe_b64encode(base_url.encode()).decode().strip("=")
+
+        formatted_url = r"https://www.virustotal.com/api/v3/urls/"+ url_id
+
+        headers = {
+        "accept": "application/json",
+        "x-apikey": "03b22a872ba26809bd287a0b4b3537d071a11c60a982220f5e9907e40657dffc"
+        }
+
+        response = requests.get(formatted_url, headers=headers)
+
+
+        # load returned json from virustotal into a python dictionary called decodedResponse
+        decodedResponse = json.loads(response.text)
+        filteredResponse = (decodedResponse["data"]["attributes"])
+        keys_to_remove = [
+                "last_http_response_content_sha256", 
+                "last_http_response_code",
+                "last_analysis_results",
+                "last_final_url", 
+                "last_http_response_content_length", 
+                "url", 
+                "last_analysis_date", 
+                "tags", 
+                "last_submission_date", 
+                "threat_names",
+                "last_http_response_headers",
+                "categories",
+                "last_modification_date",
+                "title",
+                "outgoing_links",
+                "first_submission_date",
+                "total_votes",
+                "type",
+                "id",
+                "links",
+                "trackers",
+                "last_http_response_cookies",
+                "html_meta"
+                ]
+
+    # iterate through the filteredResponse dictionary using the keys_to_remove array and pop to remove additional keys listed in the array
+        for key in keys_to_remove:
+            filteredResponse.pop(key, None)
+
+    
+        dic = filteredResponse['last_analysis_stats']
+        print(dic)
+        if int(dic['malicious']) != 0:
+            print('DO NOT GO')
         else:
-            print("Web access condition is not met.")
-    except requests.exceptions.RequestException as e:
-        print("Error occurred during web access:", str(e))
+            print("CLEAR TO GO")
+            data[base_url] = 0
+        with open("/home/kali/Desktop/final/database.txt", 'a') as f:
+            status = data[base_url]
+            f.write(base_url + "," + str(status)+ "\n")
 
-# URL to monitor
-url_to_monitor = "https://www.example.com"
 
-# Check web access
-check_web_access(url_to_monitor)
+def build_db():
+    with open("/home/kali/Desktop/final/database.txt") as db_file:
+        for line in db_file:
+            line = line.strip()
+            line_lst = line.split(",")
+            domain = line_lst[0]
+            status = line_lst[1]
+            status = status.strip()
+            data[domain] = status
+
+
+
+# def add_d(main_domain):
+#     with open("/home/kali/Desktop/final/database.txt", 'a') as f:
+#         f.write(main_domain + ",0\n")
+#         print(main_domain + ",0\n")
+
+
+def popup():
+    win = Tk()
+    win.geometry("750x270")
+    
+    Label(win, text="DO NOT VISIT SITE", 
+    font = ('Helvetica 20 bold')).pack(pady=20)
+    win.after(3000, lambda:win.destroy())
+    win.mainloop()
+
+def extract_domain_name(packet):
+    if packet.haslayer(DNS):
+        dns = packet[DNS]
+        if dns.qdcount > 0:
+            domain = dns.qd.qname.decode()
+            extracted = tldextract.extract(domain)
+            main_domain = extracted.registered_domain
+            if main_domain not in data:
+                data[main_domain] = 1
+                print(f'Unknown Site {main_domain}')
+                virus_total(main_domain)
+            else:
+                if data[main_domain] == '0':
+                    print("SAFE TO CONNECT")
+                    #os.system("sudo iptables -A OUTPUT -d {0} -j DROP".format(domain))
+                elif data[main_domain] == 0:
+                    print("SAFE TO CONNECT")
+                elif data[main_domain] == '1':
+                    print("TERMINATE CONNECTION IMMEDIATELY")
+                    popup()
+                    return
+                elif data[main_domain] == 1:                            
+                    print("TERMINATE CONNECTION IMMEDIATELY")
+                    popup()
+                    return
+                else:
+                    print(data[main_domain])
+                    print("deep shit")
+
+def sniff_packets():
+    sniff(filter="udp port 53", prn=extract_domain_name)
+
+def main():
+    build_db()
+    sniff_packets()
+
+main()

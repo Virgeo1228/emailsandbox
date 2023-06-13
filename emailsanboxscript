@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import tldextract
 from scapy.all import *
 from tldextract import *
 import requests
@@ -13,8 +14,7 @@ data = {}
 
 def virus_total(base_url):
     #URL must be encoded to work with the VirusTotal API
-    print(f"testing {base_url}")
-    print(len(base_url))
+    print(f"Testing {base_url}")
     if len(base_url) != 0:
         url_id = base64.urlsafe_b64encode(base_url.encode()).decode().strip("=")
 
@@ -22,7 +22,7 @@ def virus_total(base_url):
 
         headers = {
         "accept": "application/json",
-        "x-apikey": "03b22a872ba26809bd287a0b4b3537d071a11c60a982220f5e9907e40657dffc"
+        "x-apikey": #YOUR API KEY
         }
 
         response = requests.get(formatted_url, headers=headers)
@@ -69,13 +69,13 @@ def virus_total(base_url):
         else:
             print("CLEAR TO GO")
             data[base_url] = 0
-        with open("/home/kali/Desktop/final/database.txt", 'a') as f:
+        with open("/home/batman/Desktop/test/database.txt", 'a') as f:
             status = data[base_url]
             f.write(base_url + "," + str(status)+ "\n")
 
 
 def build_db():
-    with open("/home/kali/Desktop/final/database.txt") as db_file:
+    with open("/home/batman/Desktop/test/database.txt") as db_file:
         for line in db_file:
             line = line.strip()
             line_lst = line.split(",")
@@ -108,27 +108,19 @@ def extract_domain_name(packet):
             domain = dns.qd.qname.decode()
             extracted = tldextract.extract(domain)
             main_domain = extracted.registered_domain
-            if main_domain not in data:
-                data[main_domain] = 1
+            if main_domain not in data and len(main_domain) > 1:
+                data[main_domain] = '1'
                 print(f'Unknown Site {main_domain}')
                 virus_total(main_domain)
-            else:
+            elif len(main_domain) > 1:
                 if data[main_domain] == '0':
-                    print("SAFE TO CONNECT")
-                    #os.system("sudo iptables -A OUTPUT -d {0} -j DROP".format(domain))
-                elif data[main_domain] == 0:
                     print("SAFE TO CONNECT")
                 elif data[main_domain] == '1':
                     print("TERMINATE CONNECTION IMMEDIATELY")
                     popup()
-                    return
-                elif data[main_domain] == 1:                            
-                    print("TERMINATE CONNECTION IMMEDIATELY")
-                    popup()
-                    return
                 else:
-                    print(data[main_domain])
-                    print("deep shit")
+                    pass
+                    #print("deep shit")
 
 def sniff_packets():
     sniff(filter="udp port 53", prn=extract_domain_name)
